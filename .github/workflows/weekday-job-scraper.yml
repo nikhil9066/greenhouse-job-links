@@ -1,0 +1,81 @@
+name: Weekday Job Link Scraper
+
+on:
+  schedule:
+    # Monday-Friday only, 2 times per day
+    # Format: minute hour * * day-of-week (1=Monday, 5=Friday)
+    - cron: '0 11 * * 1-5'   # 11:00 AM UTC
+    - cron: '0 23 * * 1-5'   # 11:00 PM UTC
+
+    # Original schedule (commented out):
+    # - cron: '0 7 * * 1-5'    # 7:00 AM
+    # - cron: '0 9 * * 1-5'    # 9:00 AM
+    # - cron: '0 11 * * 1-5'   # 11:00 AM
+    # - cron: '0 15 * * 1-5'   # 3:00 PM
+    # - cron: '0 17 * * 1-5'   # 5:00 PM
+    # - cron: '0 19 * * 1-5'   # 7:00 PM
+    # - cron: '0 22 * * 1-5'   # 10:00 PM
+    # - cron: '20 23 * * 1-5'  # 11:20 PM
+
+  # Manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  scrape-job-links:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests beautifulsoup4
+
+    - name: Run lightweight job scraper
+      run: |
+        python scraper.py
+
+    - name: Check if new links found
+      id: check_links
+      run: |
+        if [ -f "latest_links.csv" ]; then
+          LINK_COUNT=$(tail -n +2 latest_links.csv 2>/dev/null | wc -l)
+          echo "links_found=$LINK_COUNT" >> $GITHUB_OUTPUT
+          echo "Found $LINK_COUNT total links in file"
+        else
+          echo "links_found=0" >> $GITHUB_OUTPUT
+          echo "No links file found"
+        fi
+
+    - name: Commit and push new links
+      if: steps.check_links.outputs.links_found > 0
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Job Scraper"
+        git add latest_links.csv
+
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          echo "No new links to commit"
+        else
+          CURRENT_TIME=$(date '+%Y-%m-%d %H:%M')
+          git commit -m "Update job links - $CURRENT_TIME (Run #${{ github.run_number }})"
+          git push
+        fi
+
+    - name: Create run summary
+      run: |
+        echo "## Job Links Scraper Run" >> $GITHUB_STEP_SUMMARY
+        echo "- **Time**: $(date '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "- **Links in file**: ${{ steps.check_links.outputs.links_found }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Run number**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        if [ -f "latest_links.csv" ]; then
+          echo "- **Download CSV**: [latest_links.csv](https://raw.githubusercontent.com/${{ github.repository }}/main/latest_links.csv)" >> $GITHUB_STEP_SUMMARY
+        fi
