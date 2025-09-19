@@ -19,7 +19,7 @@ def discover_greenhouse_job_links(target_roles, target_locations, hours_threshol
     job_links = []
     current_time = datetime.now()
 
-    print(f"Searching for jobs posted in last {hours_threshold} hours...")
+    print("Searching for all available job postings...")
 
     # Method 1: Search for each role in each location
     for role in target_roles:
@@ -48,8 +48,8 @@ def discover_greenhouse_job_links(target_roles, target_locations, hours_threshol
                             # Extract company from URL
                             company = extract_company_from_url(href)
 
-                            # Quick check if recent
-                            if is_likely_recent(href, hours_threshold):
+                            # Add all found jobs (no time filter for testing)
+                            if True:
                                 job_links.append({
                                     'link': href,
                                     'company': company or 'unknown',
@@ -94,7 +94,8 @@ def discover_greenhouse_job_links(target_roles, target_locations, hours_threshol
                         if role_matched:
                             company = extract_company_from_url(href)
 
-                            if is_likely_recent(href, hours_threshold):
+                            # Add all found jobs (no time filter for testing)
+                            if True:
                                 job_links.append({
                                     'link': href,
                                     'company': company or 'unknown',
