@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import os
 import sys
 import json
+import logging
 
 def search_with_serpapi(query, api_key):
     """
@@ -48,12 +49,12 @@ def discover_greenhouse_job_links(target_roles, target_locations, hours_threshol
     # Your SerpAPI key
     api_key = "668c832248955465a7913564ff532edf265147422a7925be210509bfa10dc091"
 
-    print("Searching for all available job postings using SerpAPI...")
+    logging.info("Searching for all available job postings using SerpAPI...")
 
     # Method 1: Search for each role in each location
     for role in target_roles:
         for location in target_locations:
-            print(f"Searching for: {role} in {location}")
+            logging.info(f"Searching for: {role} in {location}")
 
             query = f'site:job-boards.greenhouse.io "{role}" "{location}"'
 
@@ -61,7 +62,7 @@ def discover_greenhouse_job_links(target_roles, target_locations, hours_threshol
                 results = search_with_serpapi(query, api_key)
 
                 if results and 'organic_results' in results:
-                    print(f"  Found {len(results['organic_results'])} results")
+                    logging.info(f"  Found {len(results['organic_results'])} results")
 
                     for result in results['organic_results']:
                         link = result.get('link', '')
@@ -78,12 +79,12 @@ def discover_greenhouse_job_links(target_roles, target_locations, hours_threshol
                                 'snippet': result.get('snippet', 'No description')
                             })
                 else:
-                    print(f"  No results found for {query}")
+                    logging.info(f"  No results found for {query}")
 
                 time.sleep(1)  # Be respectful with API requests
 
             except Exception as e:
-                print(f"  Error searching for {role} in {location}: {e}")
+                logging.error(f"  Error searching for {role} in {location}: {e}")
                 continue
 
     # Method 2: Enhanced search patterns
@@ -95,12 +96,12 @@ def discover_greenhouse_job_links(target_roles, target_locations, hours_threshol
     ]
 
     for pattern in search_patterns:
-        print(f"Searching pattern: {pattern}")
+        logging.info(f"Searching pattern: {pattern}")
         try:
             results = search_with_serpapi(pattern, api_key)
 
             if results and 'organic_results' in results:
-                print(f"  Pattern found {len(results['organic_results'])} results")
+                logging.info(f"  Pattern found {len(results['organic_results'])} results")
 
                 for result in results['organic_results']:
                     link = result.get('link', '')
@@ -122,12 +123,12 @@ def discover_greenhouse_job_links(target_roles, target_locations, hours_threshol
                                 'snippet': result.get('snippet', 'No description')
                             })
             else:
-                print(f"  No results found for pattern: {pattern}")
+                logging.info(f"  No results found for pattern: {pattern}")
 
             time.sleep(1)
 
         except Exception as e:
-            print(f"  Error with pattern {pattern}: {e}")
+            logging.error(f"  Error with pattern {pattern}: {e}")
             continue
 
     return job_links
@@ -275,7 +276,7 @@ def save_links_to_csv(job_links, filename='latest_links.csv'):
                 job.get('snippet', 'No description')
             ])
 
-    print(f"Added {len(new_links)} new job links to {filename}")
+    logging.info(f"Added {len(new_links)} new job links to {filename}")
 
 def cleanup_old_data():
     """
@@ -293,10 +294,31 @@ def cleanup_old_data():
             except:
                 pass
 
+def setup_logging():
+    """
+    Setup logging to overwrite log file on each run
+    """
+    # Remove any existing handlers
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    # Setup logging to file (overwrite mode) and console
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('scraper_log.txt', mode='w'),  # Overwrite each time
+            logging.StreamHandler()  # Also print to console
+        ]
+    )
+
 def main():
     """
     Main function for lightweight job link scraping
     """
+    # Setup logging
+    setup_logging()
+
     # Target roles
     target_roles = [
         "data scientist",
@@ -313,10 +335,10 @@ def main():
         "Boston"
     ]
 
-    print("=" * 50)
-    print("LIGHTWEIGHT JOB LINK SCRAPER")
-    print("=" * 50)
-    print(f"Run time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info("=" * 50)
+    logging.info("LIGHTWEIGHT JOB LINK SCRAPER")
+    logging.info("=" * 50)
+    logging.info(f"Run time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Cleanup old data (only on first run of the day)
     current_hour = datetime.now().hour
@@ -329,8 +351,8 @@ def main():
     # Remove duplicates
     unique_links = remove_duplicates(job_links)
 
-    print(f"\nFound {len(job_links)} total links")
-    print(f"Unique links: {len(unique_links)}")
+    logging.info(f"\nFound {len(job_links)} total links")
+    logging.info(f"Unique links: {len(unique_links)}")
 
     # Save to CSV
     save_links_to_csv(unique_links)
@@ -342,11 +364,11 @@ def main():
             role = job['role_matched']
             role_counts[role] = role_counts.get(role, 0) + 1
 
-        print("\nNew links by role:")
+        logging.info("\nNew links by role:")
         for role, count in role_counts.items():
-            print(f"  {role}: {count}")
+            logging.info(f"  {role}: {count}")
 
-    print(f"Scraping completed at {datetime.now().strftime('%H:%M:%S')}")
+    logging.info(f"Scraping completed at {datetime.now().strftime('%H:%M:%S')}")
 
 if __name__ == "__main__":
     main()
