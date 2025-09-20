@@ -26,3 +26,10 @@ Thumbs.db
 
 # Logs
 *.log
+scraper_log.txt
+
+# Jupyter notebooks
+*.ipynb
+
+# Temporary files
+work.*

@@ -11,106 +11,134 @@ import time
 from datetime import datetime, timedelta
 import os
 import sys
+import json
+import logging
+
+def search_with_serpapi(query, api_key):
+    """
+    Search using SerpAPI
+    """
+    try:
+        url = "https://serpapi.com/search.json"
+        params = {
+            'q': query,
+            'api_key': api_key,
+            'engine': 'google',
+            'num': 1  # Get 1 result per search for 20 total
+        }
+
+        response = requests.get(url, params=params, timeout=15)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"SerpAPI error: {response.status_code}")
+            return None
+
+    except Exception as e:
+        print(f"SerpAPI request failed: {e}")
+        return None
 
 def discover_greenhouse_job_links(target_roles, target_locations, hours_threshold=2):
     """
-    Discover job links across all greenhouse.io without targeting specific companies
+    Discover job links across all greenhouse.io using SerpAPI
     """
     job_links = []
     current_time = datetime.now()
 
-    print("Searching for all available job postings...")
+    # Your SerpAPI key
+    api_key = "668c832248955465a7913564ff532edf265147422a7925be210509bfa10dc091"
+
+    logging.info("Searching for all available job postings using SerpAPI...")
 
     # Method 1: Search for each role in each location
     for role in target_roles:
         for location in target_locations:
-            print(f"Searching for: {role} in {location}")
+            logging.info(f"Searching for: {role} in {location}")
+
+            query = f'site:job-boards.greenhouse.io "{role}" "{location}"'
 
             try:
-                search_url = "https://duckduckgo.com/html/"
-                params = {
-                    'q': f'site:job-boards.greenhouse.io "{role}" "{location}"'
-                }
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
+                results = search_with_serpapi(query, api_key)
 
-                response = requests.get(search_url, params=params, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
+                if results and 'organic_results' in results:
+                    logging.info(f"  Found {len(results['organic_results'])} results")
 
-                    # Extract all greenhouse job links
-                    links = soup.find_all('a', href=True)
-                    for link in links:
-                        href = link.get('href')
-                        if href and 'job-boards.greenhouse.io' in href and '/jobs/' in href:
+                    for result in results['organic_results']:
+                        link = result.get('link', '')
+                        if 'job-boards.greenhouse.io' in link and '/jobs/' in link:
+                            company = extract_company_from_url(link)
 
-                            # Extract company from URL
-                            company = extract_company_from_url(href)
+                            job_links.append({
+                                'link': link,
+                                'company': company or 'unknown',
+                                'role_matched': role,
+                                'location_searched': location,
+                                'found_at': current_time.strftime('%Y-%m-%d %H:%M:%S'),
+                                'title': result.get('title', 'No title'),
+                                'snippet': result.get('snippet', 'No description')
+                            })
+                else:
+                    logging.info(f"  No results found for {query}")
 
-                            # Add all found jobs (no time filter for testing)
-                            if True:
-                                job_links.append({
-                                    'link': href,
-                                    'company': company or 'unknown',
-                                    'role_matched': role,
-                                    'location_searched': location,
-                                    'found_at': current_time.strftime('%Y-%m-%d %H:%M:%S')
-                                })
-
-                time.sleep(2)  # Be respectful with search requests
+                time.sleep(1)  # Be respectful with API requests
 
             except Exception as e:
-                print(f"  Error searching for {role} in {location}: {e}")
+                logging.error(f"  Error searching for {role} in {location}: {e}")
                 continue
 
-    # Method 2: Enhanced search patterns with US filter only
+    # Method 2: Enhanced search patterns
     search_patterns = [
-        'site:job-boards.greenhouse.io "data scientist" "posted" "US"',
-        'site:job-boards.greenhouse.io "machine learning" "new" "US"',
-        'site:job-boards.greenhouse.io "data analyst" "hiring" "US"',
-        'site:job-boards.greenhouse.io "ai engineer" "posted" "US"'
+        'site:job-boards.greenhouse.io "data scientist" "remote" OR "US"',
+        'site:job-boards.greenhouse.io "machine learning engineer" "remote" OR "US"',
+        'site:job-boards.greenhouse.io "data analyst" "remote" OR "US"',
+        'site:job-boards.greenhouse.io "ai engineer" "remote" OR "US"'
     ]
 
     for pattern in search_patterns:
-        print(f"Searching pattern: {pattern}")
+        logging.info(f"Searching pattern: {pattern}")
         try:
-            search_url = "https://duckduckgo.com/html/"
-            params = {'q': pattern}
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            results = search_with_serpapi(pattern, api_key)
 
-            response = requests.get(search_url, params=params, headers=headers, timeout=10)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
+            if results and 'organic_results' in results:
+                logging.info(f"  Pattern found {len(results['organic_results'])} results")
 
-                links = soup.find_all('a', href=True)
-                for link in links:
-                    href = link.get('href')
-                    if href and 'job-boards.greenhouse.io' in href and '/jobs/' in href:
+                for result in results['organic_results']:
+                    link = result.get('link', '')
+                    if 'job-boards.greenhouse.io' in link and '/jobs/' in link:
 
                         # Determine which role this matches
-                        role_matched = determine_role_from_url(href, target_roles)
+                        role_matched = determine_role_from_pattern(pattern, target_roles)
 
                         if role_matched:
-                            company = extract_company_from_url(href)
+                            company = extract_company_from_url(link)
 
-                            # Add all found jobs (no time filter for testing)
-                            if True:
-                                job_links.append({
-                                    'link': href,
-                                    'company': company or 'unknown',
-                                    'role_matched': role_matched,
-                                    'location_searched': 'US',
-                                    'found_at': current_time.strftime('%Y-%m-%d %H:%M:%S')
-                                })
+                            job_links.append({
+                                'link': link,
+                                'company': company or 'unknown',
+                                'role_matched': role_matched,
+                                'location_searched': 'US/Remote',
+                                'found_at': current_time.strftime('%Y-%m-%d %H:%M:%S'),
+                                'title': result.get('title', 'No title'),
+                                'snippet': result.get('snippet', 'No description')
+                            })
+            else:
+                logging.info(f"  No results found for pattern: {pattern}")
 
             time.sleep(1)
 
         except Exception as e:
-            print(f"  Error with pattern {pattern}: {e}")
+            logging.error(f"  Error with pattern {pattern}: {e}")
             continue
 
     return job_links
+
+def determine_role_from_pattern(pattern, target_roles):
+    """Determine which role this pattern matches"""
+    for role in target_roles:
+        if role.lower() in pattern.lower():
+            return role
+    return "unknown"
 
 def determine_location_from_pattern(pattern, target_locations):
     """Extract location from search pattern"""
@@ -210,7 +238,7 @@ def load_existing_links(filename):
 
 def save_links_to_csv(job_links, filename='latest_links.csv'):
     """
-    Save job links to CSV
+    Save job links to CSV with enhanced data from SerpAPI
     """
     if not job_links:
         print("No new job links to save")
@@ -234,7 +262,7 @@ def save_links_to_csv(job_links, filename='latest_links.csv'):
 
         # Write header if new file
         if not file_exists:
-            writer.writerow(['link', 'company', 'role_matched', 'location_searched', 'found_at'])
+            writer.writerow(['link', 'company', 'role_matched', 'location_searched', 'found_at', 'title', 'snippet'])
 
         # Write new links
         for job in new_links:
@@ -243,10 +271,12 @@ def save_links_to_csv(job_links, filename='latest_links.csv'):
                 job['company'],
                 job['role_matched'],
                 job.get('location_searched', 'unknown'),
-                job['found_at']
+                job['found_at'],
+                job.get('title', 'No title'),
+                job.get('snippet', 'No description')
             ])
 
-    print(f"Added {len(new_links)} new job links to {filename}")
+    logging.info(f"Added {len(new_links)} new job links to {filename}")
 
 def cleanup_old_data():
     """
@@ -264,10 +294,31 @@ def cleanup_old_data():
             except:
                 pass
 
+def setup_logging():
+    """
+    Setup logging to overwrite log file on each run
+    """
+    # Remove any existing handlers
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    # Setup logging to file (overwrite mode) and console
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('scraper_log.txt', mode='w'),  # Overwrite each time
+            logging.StreamHandler()  # Also print to console
+        ]
+    )
+
 def main():
     """
     Main function for lightweight job link scraping
     """
+    # Setup logging
+    setup_logging()
+
     # Target roles
     target_roles = [
         "data scientist",
@@ -284,10 +335,10 @@ def main():
         "Boston"
     ]
 
-    print("=" * 50)
-    print("LIGHTWEIGHT JOB LINK SCRAPER")
-    print("=" * 50)
-    print(f"Run time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info("=" * 50)
+    logging.info("LIGHTWEIGHT JOB LINK SCRAPER")
+    logging.info("=" * 50)
+    logging.info(f"Run time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Cleanup old data (only on first run of the day)
     current_hour = datetime.now().hour
@@ -300,8 +351,8 @@ def main():
     # Remove duplicates
     unique_links = remove_duplicates(job_links)
 
-    print(f"\nFound {len(job_links)} total links")
-    print(f"Unique links: {len(unique_links)}")
+    logging.info(f"\nFound {len(job_links)} total links")
+    logging.info(f"Unique links: {len(unique_links)}")
 
     # Save to CSV
     save_links_to_csv(unique_links)
@@ -313,11 +364,11 @@ def main():
             role = job['role_matched']
             role_counts[role] = role_counts.get(role, 0) + 1
 
-        print("\nNew links by role:")
+        logging.info("\nNew links by role:")
         for role, count in role_counts.items():
-            print(f"  {role}: {count}")
+            logging.info(f"  {role}: {count}")
 
-    print(f"Scraping completed at {datetime.now().strftime('%H:%M:%S')}")
+    logging.info(f"Scraping completed at {datetime.now().strftime('%H:%M:%S')}")
 
 if __name__ == "__main__":
     main()
