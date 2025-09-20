@@ -69,15 +69,17 @@ def discover_greenhouse_job_links(target_roles, target_locations, hours_threshol
                         if 'job-boards.greenhouse.io' in link and '/jobs/' in link:
                             company = extract_company_from_url(link)
 
-                            job_links.append({
-                                'link': link,
-                                'company': company or 'unknown',
-                                'role_matched': role,
-                                'location_searched': location,
-                                'found_at': current_time.strftime('%Y-%m-%d %H:%M:%S'),
-                                'title': result.get('title', 'No title'),
-                                'snippet': result.get('snippet', 'No description')
-                            })
+                            # Check if job is recent (within 2 hours)
+                            if is_likely_recent(link, hours_threshold):
+                                job_links.append({
+                                    'link': link,
+                                    'company': company or 'unknown',
+                                    'role_matched': role,
+                                    'location_searched': location,
+                                    'found_at': current_time.strftime('%Y-%m-%d %H:%M:%S'),
+                                    'title': result.get('title', 'No title'),
+                                    'snippet': result.get('snippet', 'No description')
+                                })
                 else:
                     logging.info(f"  No results found for {query}")
 
@@ -113,15 +115,17 @@ def discover_greenhouse_job_links(target_roles, target_locations, hours_threshol
                         if role_matched:
                             company = extract_company_from_url(link)
 
-                            job_links.append({
-                                'link': link,
-                                'company': company or 'unknown',
-                                'role_matched': role_matched,
-                                'location_searched': 'US/Remote',
-                                'found_at': current_time.strftime('%Y-%m-%d %H:%M:%S'),
-                                'title': result.get('title', 'No title'),
-                                'snippet': result.get('snippet', 'No description')
-                            })
+                            # Check if job is recent (within 2 hours)
+                            if is_likely_recent(link, hours_threshold):
+                                job_links.append({
+                                    'link': link,
+                                    'company': company or 'unknown',
+                                    'role_matched': role_matched,
+                                    'location_searched': 'US/Remote',
+                                    'found_at': current_time.strftime('%Y-%m-%d %H:%M:%S'),
+                                    'title': result.get('title', 'No title'),
+                                    'snippet': result.get('snippet', 'No description')
+                                })
             else:
                 logging.info(f"  No results found for pattern: {pattern}")
 
