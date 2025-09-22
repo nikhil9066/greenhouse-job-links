@@ -2,10 +2,11 @@ name: Weekday Job Link Scraper
 
 on:
   schedule:
-    # Monday-Friday only, 2 times per day
+    # Monday-Friday only, 3 times per day
     # Format: minute hour * * day-of-week (1=Monday, 5=Friday)
-    - cron: '0 11 * * 1-5'   # 11:00 AM UTC
-    - cron: '0 23 * * 1-5'   # 11:00 PM UTC
+    - cron: '0 11 * * 1-5'   # 11:00 AM UTC (7:00 AM Atlanta)
+    - cron: '0 15 * * 1-5'   # 3:00 PM UTC (11:00 AM Atlanta)
+    - cron: '0 23 * * 1-5'   # 11:00 PM UTC (7:00 PM Atlanta)
 
     # Original schedule (commented out):
     # - cron: '0 7 * * 1-5'    # 7:00 AM
